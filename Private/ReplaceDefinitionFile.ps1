@@ -1,0 +1,1 @@
+Copy-Item -Path "$(Split-Path $script:MyInvocation.MyCommand.Path)\Private\DCTools-final.psd1" -Destination "$(Split-Path $script:MyInvocation.MyCommand.Path)\TwitchYarby.DCTools.psd1" -Force
