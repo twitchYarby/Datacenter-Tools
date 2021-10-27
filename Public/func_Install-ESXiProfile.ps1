@@ -64,7 +64,7 @@ function Install-ESXiProfile {
                 }
             }
         }else{
-            throw [System.Exception] "Depot must either point to the index.xml of an online depot or the zip of an offline bundle."
+            throw [System.Exception] "Depot must either point to the index.xml of an online depot or the .zip of an offline bundle."
         }
     }
 
