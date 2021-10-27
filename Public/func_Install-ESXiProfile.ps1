@@ -11,8 +11,8 @@ function Install-ESXiProfile {
     Param(
         [Parameter(Mandatory)]
         [VMware.VimAutomation.ViCore.Impl.V1.EsxCli.EsxCliElementImpl]$VMHostESXCLI,
-        [string]$LocalDepot = $null,
-        [string]$RemoteDepot = $null,
+        [Parameter(Mandatory)]
+        [string]$Depot,
         [switch]$Dryrun,
         [switch]$Force,
         [switch]$MaintenanceMode,
@@ -25,48 +25,50 @@ function Install-ESXiProfile {
         [string]$Proxy = $null
     )
 
-    #Make sure both Local and Remote Depots are not specified
-    if ($null -ne $RemoteDepot -and $null -ne $LocalDepot) {
-        throw [System.Exception] "Cannot specify both Local and Remote Depot."
+    #Validation - Check if depot is remote or local
+    $ext = $Depot.Substring($Depot.Length - 3)
+    if ($ext -eq "zip") {
+
+        #Check if the LocalDepot file exists
+        if ($null -ne $LocalDepot) {
+            #Split the path so we can extract the datastore name
+            $splitpath = $LocalDepot -Split '/'
+            $ds = Get-Datastore -Name $splitpath[3] -ErrorAction Ignore
+
+            if ($null -eq $ds) {
+                throw [System.Exception] "Local Depot not found. Cannot locate datastore " + $ds
+            }
+
+            #Get the vmstore path for the datastore
+            $dsPath = $ds.DatastoreBrowserPath
+
+            #Build the vmstore path
+            $depotPath = $dsPath
+            for ($i = 4; $i -lt $splitpath.Count; $i++){
+                $depotPath = $depotPath + "\\" + $splitpath[$i]
+            }
+
+            #Use the vmstore path to test if the depot file exists
+            if (Test-Path $depotPath -ne 'True')
+            {
+                throw [System.IO.FileNotFoundException] "Local depot not found. " + $LocalDepot
+            }
+        }
+    }else {
+        if ($ext -eq "xml") {
+            #Check if RemoteDepot is reachable
+            if ($null -ne $RemoteDepot) {
+                $statuscode = Invoke-WebRequest $RemoteDepot | Select-Object statuscode
+                if ($statuscode -ne 200) {
+                    throw [System.Exception] "Remote Depot is not reachable. " + $RemoteDepot
+                }
+            }
+        }else{
+            throw [System.Exception] "Depot must either point to the index.xml of an online depot or the zip of an offline bundle."
+        }
     }
 
-    #Check if the LocalDepot file exists
-    if ($null -ne $LocalDepot) {
-        #Split the path so we can extract the datastore name
-        $splitpath = $LocalDepot -Split '/'
-        $ds = Get-Datastore -Name $splitpath[3]
-
-        #Get the vmstore path for the datastore
-        $dsPath = $ds.DatastoreBrowserPath
-
-        #Build the vmstore path
-        $depotPath = $dsPath
-        for ($i = 4; $i -lt $splitpath.Count; $i++){
-            $depotPath = $depotPath + "\\" + $splitpath[$i]
-        }
-
-        #Use the vmstore path to test if the depot file exists
-        if (Test-Path $depotPath -ne 'True')
-        {
-            throw [System.IO.FileNotFoundException] "Local depot not found. " + $LocalDepot
-        }
-
-        #Pass along the depot to the rest of the script
-        $Depot = $LocalDepot
-    }
-
-    #Check if RemoteDepot is reachable
-    if ($null -ne $RemoteDepot) {
-        $statuscode = Invoke-WebRequest $RemoteDepot | Select-Object statuscode
-        if ($statuscode -ne 200) {
-            throw [System.Exception] "Remote Depot is not reachable. " + $RemoteDepot
-        }
-
-        #Pass along the depot to the rest of the script
-        $Depot = $RemoteDepot
-    }
-
-    #Check if the ImageProfile exists
+    #Validation - Check if the ImageProfile exists
     $profiles = $VMHostESXCLI.software.sources.profile.list.Invoke(@{'depot' = $Depot})
     if ($profiles.Name.Contains($ImageProfile) -ne "True")
     {
