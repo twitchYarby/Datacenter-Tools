@@ -10,7 +10,7 @@
     
 .PARAMETER Depot
     Specifies full remote URL of the depot index.xml or file path pointing to an offline bundle .zip file on a local datastore.
-    Use vmstore:\DatastoreName\path\depot.zip OR https://URL/index.xml
+    Use /path/to/depot.zip OR https://URL/index.xml
 
 .PARAMETER Dryrun
      Performs a dry-run only. Report the VIB-level operations that would be performed, but do not change anything in the system.

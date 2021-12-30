@@ -13,7 +13,7 @@ function Install-ESXiProfile {
     
     .PARAMETER Depot
         Specifies full remote URL of the depot index.xml or file path pointing to an offline bundle .zip file on a local datastore.
-        Use vmstore:\DatastoreName\path\depot.zip OR https://URL/index.xml
+        Use /path/to/depot.zip OR https://URL/index.xml
 
     .PARAMETER Dryrun
         Performs a dry-run only. Report the VIB-level operations that would be performed, but do not change anything in the system.
@@ -80,10 +80,15 @@ function Install-ESXiProfile {
     }
 
     #Validation - Check if the ImageProfile exists
-    $profiles = $VMHostESXCLI.software.sources.profile.list.Invoke(@{'depot' = $Depot})
-    if ($profiles.Name.Contains($ImageProfile) -ne "True")
-    {
-        throw [System.Exception] "Depot exists, but does not contain the specified Image Profile: " + $ImageProfile
+    try{
+        $profiles = $VMHostESXCLI.software.sources.profile.list.Invoke(@{'depot' = $Depot})
+        
+        if ($profiles.Name.Contains($ImageProfile) -ne "True")
+        {
+            throw [System.Exception] "Depot exists, but does not contain the specified Image Profile: " + $ImageProfile
+        }
+    }catch{
+        throw [System.Exception] "Depot does not exists or is corrupt."
     }
 
     #Prepare Arguments
