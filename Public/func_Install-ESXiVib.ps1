@@ -81,15 +81,15 @@ function Install-ESXiVib {
     #Prepare Arguments
     $arguments = @{}
 
-    if ($null -eq $Depot) {
+    if ($null -ne $Depot) {
         $arguments.Add('depot', $Depot)
     }
 
-    if ($null -eq $VibName) {
+    if ($null -ne $VibName) {
         $arguments.Add('vibname', $VibName)
     }
 
-    if ($null -eq $VibUrl) {
+    if ($null -ne $VibUrl) {
         $arguments.Add('viburl', $VibUrl)
     }
 
