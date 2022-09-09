@@ -1,14 +1,52 @@
 <#
 .Synopsis
-    Install a new Vib to the specified ESXi host from a local datastore
+    Installs VIB packages from a URL or depot
 .Description
-    This command is the PowerCLI equivalent of executing the shell command: esxcli software vib install
+    Installs VIB packages from a URL or depot. VIBs may be installed, upgraded, or downgraded.
+    WARNING: If your installation requires a reboot, you need to disable HA first.
+
+.PARAMETER VMHost
+    The VMHost instance for the host being updated
+    
+.PARAMETER Depot
+    Specifies full remote URL of the depot index.xml or file path pointing to an offline bundle .zip file on a local datastore.
+    Use /path/to/depot.zip OR https://URL/index.xml
+
+.PARAMETER Dryrun
+     Performs a dry-run only. Report the VIB-level operations that would be performed, but do not change anything in the system.
+    
+.PARAMETER Force
+    Bypasses checks for package dependencies, conflicts, obsolescence, and acceptance levels. Really not recommended
+    unless you know what you are doing. Use of this option will result in a warning being displayed in vSphere Web Client.
+    Use this option only when instructed to do so by VMware Technical Support.
+
+.PARAMETER MaintenanceMode
+    Pretends that maintenance mode is in effect. Otherwise, installation will stop for live installs that require maintenance mode.
+    This flag has no effect for reboot required remediations.
+
+.PARAMETER NoLiveInstall
+    Forces an install to /altbootbank even if the VIBs are eligible for live installation or removal.
+    Will cause installation to be skipped on PXE-booted hosts.
+
+.PARAMETER NoSigCheck
+    Bypasses acceptance level verification, including signing.
+    Use of this option poses a large security risk and will result in a SECURITY ALERT warning being displayed in vSphere Web Client.
+
+.PARAMETER Proxy
+    Specifies a proxy server to use for HTTP, FTP, and HTTPS connections. The format is proxy-url:port.
+
+.PARAMETER VibName
+    Specifies VIBs from a depot, using one of the following forms: name, name:version, vendor:name, or vendor:name:version.
+
+.PARAMETER VibUrl
+    Specifies one URL of a VIB package to install. http:, https:, ftp:, and file: are all supported.
 #>
 function Install-ESXiVib {
     [CmdletBinding()]
     Param(
         [Parameter(Mandatory)]
-        [EsxCliImpl]$VMHostESXCLI,
+        [ValidateNotNullOrEmpty()]
+        [VMware.VimAutomation.ViCore.Types.V1.Inventory.VMHost]$VMHost,
         [string]$Depot,
         [switch]$Dryrun,
         [switch]$Force,
@@ -35,47 +73,10 @@ function Install-ESXiVib {
         throw [System.Exception] "When using a Depot, you must specify a Vib Name."
     }
 
-    #Validation - Check if depot is remote or local
-    $ext = $Depot.Substring($Depot.Length - 3)
-    if ($ext -eq "zip") {
-
-        #Check if the LocalDepot file exists
-        if ($null -ne $LocalDepot) {
-            #Split the path so we can extract the datastore name
-            $splitpath = $LocalDepot -Split '/'
-            $ds = Get-Datastore -Name $splitpath[3] -ErrorAction Ignore
-
-            if ($null -eq $ds) {
-                throw [System.Exception] "Local Depot not found. Cannot locate datastore " + $ds
-            }
-
-            #Get the vmstore path for the datastore
-            $dsPath = $ds.DatastoreBrowserPath
-
-            #Build the vmstore path
-            $depotPath = $dsPath
-            for ($i = 4; $i -lt $splitpath.Count; $i++){
-                $depotPath = $depotPath + "\\" + $splitpath[$i]
-            }
-
-            #Use the vmstore path to test if the depot file exists
-            if (Test-Path $depotPath -ne 'True')
-            {
-                throw [System.IO.FileNotFoundException] "Local depot not found. " + $LocalDepot
-            }
-        }
-    }else {
-        if ($ext -eq "xml") {
-            #Check if RemoteDepot is reachable
-            if ($null -ne $RemoteDepot) {
-                $statuscode = Invoke-WebRequest $RemoteDepot | Select-Object statuscode
-                if ($statuscode -ne 200) {
-                    throw [System.Exception] "Remote Depot is not reachable. " + $RemoteDepot
-                }
-            }
-        }else{
-            throw [System.Exception] "Depot must either point to the index.xml of an online depot or the zip of an offline bundle."
-        }
+    try {
+        $VMHostESXCLI = Get-EsxCli -V2 -VMHost $VMHost -ErrorAction:Stop
+    } catch {
+        throw [System.Exception] "Failed to get the EsxCli session for the specified host"
     }
 
     #Prepare Arguments
